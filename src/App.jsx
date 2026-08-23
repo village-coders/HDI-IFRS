@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { api } from "./services/api.js";
 import {
   LayoutDashboard, Bell, BookOpen, Users as UsersIcon, LogOut, ChevronDown,
@@ -30,9 +31,7 @@ const T = {
 
 const STATUS = {
   new:                   { label: "New",                   color: "#2563EB", bg: "#EFF6FF" },
-  pending:               { label: "Pending",                color: "#D97706", bg: "#FEF3C7" },
   verified:              { label: "Under Review",           color: "#4338CA", bg: "#EEF2FF" },
-  further_approval:      { label: "Board Review",           color: "#7C3AED", bg: "#F5F3FF" },
   approved_for_payment:  { label: "Approved For Payment",   color: "#0D9488", bg: "#CCFBF1" },
   paid:                  { label: "Paid",                   color: "#16A34A", bg: "#DCFCE7" },
   rejected:              { label: "Rejected",                color: "#DC2626", bg: "#FEE2E2" },
@@ -47,100 +46,65 @@ const CLAIMS_SEED = [
   {
     _id: "claim_1",
     id: "MDOS-10049281",
-    claimant: "Ibrahim Musa",
-    dept: "Operations",
-    title: "Official Duty Expense",
+    claimant: "Super Admin",
+    dept: "Administration",
+    title: "Office IT & Supplies",
     amount: 45000,
     date: "2026-08-20",
     status: "new",
-    note: "Initial claim submission for transit and logistics.",
+    note: "Initial claim submission for review.",
   },
   {
     _id: "claim_2",
     id: "MDOS-20491823",
-    claimant: "Chidinma Okoro",
-    dept: "Finance & Accounts",
-    title: "Audit & Supervision",
+    claimant: "Super Admin",
+    dept: "Administration",
+    title: "Project Audit Logistics",
     amount: 120000,
     date: "2026-08-18",
     status: "verified",
-    note: "Verified by FO. Forwarded for Chairman review.",
-  },
-  {
-    _id: "claim_3",
-    id: "MDOS-39281048",
-    claimant: "Samuel Ekong",
-    dept: "Audit",
-    title: "Overseas Travel & Hotel",
-    amount: 285000,
-    date: "2026-08-15",
-    status: "further_approval",
-    note: "Submitted to Chairman & Board for high-value review.",
+    note: "Verified by Admin. Forwarded for Chairman review.",
   },
   {
     _id: "claim_4",
     id: "MDOS-48201938",
-    claimant: "Funmi Adisa",
-    dept: "Admin",
-    title: "Office Consumables & Supplies",
+    claimant: "Super Admin",
+    dept: "Administration",
+    title: "Office Consumables & Equipment",
     amount: 68000,
     date: "2026-08-12",
     status: "approved_for_payment",
-    note: "Verified by Chairman. Sent to Accountant for disbursement.",
+    note: "Approved by Chairman. Ready for payment disbursement.",
   },
   {
     _id: "claim_5",
     id: "MDOS-59302910",
-    claimant: "Ibrahim Musa",
-    dept: "Operations",
-    title: "Taxi Fare & Sundry",
+    claimant: "Super Admin",
+    dept: "Administration",
+    title: "Field Operations & Fuel",
     amount: 35000,
     date: "2026-08-05",
     status: "paid",
-    note: "Payment completed successfully.",
+    note: "Payment disbursed successfully.",
   },
 ];
 
 const USERS_SEED = [
   {
     _id: "u_admin",
-    name: "Admin Super Admin",
+    name: "Super Admin",
     username: "admin",
-    password: "admin123",
-    email: "admin@hdiportal.com",
+    password: "password123",
+    email: "admin@hdi.org",
     role: "admin",
   },
   {
     _id: "u_chairman",
     name: "Chairman Board",
     username: "chairman",
-    password: "chairman123",
-    email: "chairman@hdiportal.com",
+    password: "password123",
+    email: "chairman@hdi.org",
     role: "chairman",
-  },
-  {
-    _id: "u_fofficer",
-    name: "Chidinma Okoro (FO)",
-    username: "fofficer",
-    password: "fofficer123",
-    email: "chidinma@hdiportal.com",
-    role: "financial_officer",
-  },
-  {
-    _id: "u_accountant",
-    name: "Samuel Ekong (Accountant)",
-    username: "accountant",
-    password: "accountant123",
-    email: "samuel@hdiportal.com",
-    role: "accountant",
-  },
-  {
-    _id: "u_user",
-    name: "Ibrahim Musa (User)",
-    username: "imusa",
-    password: "user123",
-    email: "ibrahim@hdiportal.com",
-    role: "user",
   },
 ];
 
@@ -148,7 +112,7 @@ const NOTIFICATIONS_SEED = [
   {
     id: "notif_1",
     title: "New Claim Submitted",
-    body: "Claim MDOS-10049281 submitted by Ibrahim Musa.",
+    body: "Claim MDOS-10049281 submitted by Super Admin.",
     type: "claim",
     read: false,
     time: "10 mins ago",
@@ -175,45 +139,31 @@ const NOTIFICATIONS_SEED = [
 /* ROLE & MENU CONFIG                                                */
 /* ---------------------------------------------------------------- */
 const ROLES = [
-  { id: "admin", label: "Admin Super Admin", icon: ShieldCheck },
+  { id: "admin", label: "Admin (Operations & Accounts)", icon: ShieldCheck },
   { id: "chairman", label: "Chairman Board", icon: Building2 },
-  { id: "financial_officer", label: "Financial Officer", icon: Wallet },
-  { id: "accountant", label: "Accountant", icon: Calculator },
-  { id: "user", label: "User", icon: UserIcon },
 ];
 
 const CLAIM_ITEMS = [
   { key: "manage-claim-sheet", label: "New Claim", icon: FileEdit },
   { key: "all-claims-list", label: "Manage Claim List", icon: LayoutDashboard },
-  { key: "new-claim-list", label: "New Claim List", icon: FilePlus2, status: "new" },
   { key: "reviews-list", label: "Reviews", icon: BadgeCheck, status: "verified" },
-  { key: "further-approval", label: "Further Approval", icon: Building, status: "further_approval" },
   { key: "approved-for-payment", label: "Approved For Payment", icon: CircleDollarSign, status: "approved_for_payment" },
   { key: "paid-list", label: "Paid List", icon: CheckCircle2, status: "paid" },
-  { key: "pending-claim-list", label: "Pending Claim List", icon: Clock3, status: "pending" },
   { key: "rejected-claim-list", label: "Rejected Claim List", icon: XCircle, status: "rejected" },
 ];
 
 const MENU_ACCESS = {
-  user: ["dashboard", "manage-claim-sheet", "all-claims-list", "pending-claim-list", "rejected-claim-list", "track-claim"],
-  financial_officer: ["dashboard", "manage-claim-sheet", "all-claims-list", "new-claim-list", "pending-claim-list", "rejected-claim-list", "track-claim"],
-  // Further Approval removed ONLY from Chairman dashboard/sidebar access (Chairman uses Reviews)
-  chairman: ["dashboard", "reviews-list", "all-claims-list", "track-claim"],
-  accountant: ["dashboard", "manage-claim-sheet", "all-claims-list", "approved-for-payment", "paid-list", "track-claim"],
-  // Admin retains full access including Further Approval
-  admin: ["dashboard", "manage-claim-sheet", "all-claims-list", "new-claim-list", "reviews-list", "further-approval", "approved-for-payment", "paid-list", "pending-claim-list", "rejected-claim-list", "users", "track-claim"],
+  chairman: ["dashboard", "reviews-list", "all-claims-list", "rejected-claim-list", "track-claim"],
+  admin: ["dashboard", "manage-claim-sheet", "all-claims-list", "reviews-list", "approved-for-payment", "paid-list", "rejected-claim-list", "users", "track-claim"],
 };
 
 const VIEW_TITLES = {
   dashboard: "Dashboard Overview",
   "manage-claim-sheet": "New Claim Application",
   "all-claims-list": "Manage Claim List",
-  "new-claim-list": "New Claim List",
   "reviews-list": "Reviews",
-  "further-approval": "Further Approval",
   "approved-for-payment": "Approved For Payment",
   "paid-list": "Paid List",
-  "pending-claim-list": "Pending Claim List",
   "rejected-claim-list": "Rejected Claim List",
   users: "User Account Management",
   "track-claim": "Claim Processing Tracker",
@@ -531,12 +481,9 @@ function Sidebar({ role, activeView, setActiveView, mobileOpen, setMobileOpen, c
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { key: "manage-claim-sheet", label: "New Claim", icon: FileEdit },
     { key: "all-claims-list", label: "Manage Claim List", icon: FileText },
-    { key: "new-claim-list", label: "New Claim List", icon: FilePlus2, status: "new" },
     { key: "reviews-list", label: "Reviews", icon: BadgeCheck, status: "verified" },
-    { key: "further-approval", label: "Further Approval", icon: Building, status: "further_approval" },
     { key: "approved-for-payment", label: "Approved For Payment", icon: CircleDollarSign, status: "approved_for_payment" },
     { key: "paid-list", label: "Paid List", icon: CheckCircle2, status: "paid" },
-    { key: "pending-claim-list", label: "Pending Claim List", icon: Clock3, status: "pending" },
     { key: "rejected-claim-list", label: "Rejected Claim List", icon: XCircle, status: "rejected" },
     ...(role === "admin" ? [{ key: "users", label: "User Accounts", icon: UsersIcon }] : []),
   ];
@@ -729,54 +676,29 @@ function DashboardView({ role, claims, users, currentUser, onNavigate, onTrackCl
     const c = {};
     Object.keys(STATUS).forEach((k) => (c[k] = claims.filter((x) => x.status === k).length));
     c.total = claims.length;
-    c.mine = claims.filter((x) => x.claimant === currentUser).length;
     return c;
-  }, [claims, currentUser]);
+  }, [claims]);
 
   let cards = [];
-  if (role === "user") {
+  if (role === "chairman") {
     cards = [
-      { label: "My Claims", value: counts.mine, icon: FileEdit, accent: "#2563EB", targetView: "all-claims-list" },
-      { label: "Pending Feedback", value: claims.filter((c) => c.claimant === currentUser && c.status === "pending").length, icon: Clock3, accent: "#D97706", targetView: "pending-claim-list" },
-      { label: "Rejected Claims", value: claims.filter((c) => c.claimant === currentUser && c.status === "rejected").length, icon: XCircle, accent: "#DC2626", targetView: "rejected-claim-list" },
-      { label: "Paid To Date", value: claims.filter((c) => c.claimant === currentUser && c.status === "paid").length, icon: CheckCircle2, accent: T.greenPrimary, targetView: "all-claims-list" },
-    ];
-  } else if (role === "financial_officer") {
-    cards = [
-      { label: "New Claims", value: counts.new, icon: FilePlus2, accent: "#2563EB", targetView: "new-claim-list" },
-      { label: "Pending Feedback", value: counts.pending, icon: Clock3, accent: "#D97706", targetView: "pending-claim-list" },
-      { label: "Under Review", value: counts.verified, icon: BadgeCheck, accent: "#4338CA", targetView: "all-claims-list" },
-      { label: "Rejected Claims", value: counts.rejected, icon: XCircle, accent: "#DC2626", targetView: "rejected-claim-list" },
-    ];
-  } else if (role === "accountant") {
-    cards = [
-      { label: "Approved For Payment", value: counts.approved_for_payment, icon: CircleDollarSign, accent: "#0D9488", targetView: "approved-for-payment" },
-      { label: "Paid Claims", value: counts.paid, icon: CheckCircle2, accent: T.greenPrimary, targetView: "paid-list" },
-      { label: "Total Paid Value", value: fmtN(claims.filter((c) => c.status === "paid").reduce((s, c) => s + (c.amount || 0), 0)), icon: Wallet, accent: "#047857", targetView: "paid-list" },
-      { label: "Pending Processing", value: counts.pending, icon: Clock3, accent: "#D97706", targetView: "all-claims-list" },
-    ];
-  } else if (role === "chairman") {
-    // Chairman Dashboard: Further Approval removed here; uses Reviews
-    cards = [
-      { label: "In Review (Chairman)", value: counts.verified, icon: BadgeCheck, accent: "#4338CA", targetView: "reviews-list" },
-      { label: "Review Total Value", value: fmtN(claims.filter((c) => c.status === "verified").reduce((s, c) => s + (c.amount || 0), 0)), icon: CircleDollarSign, accent: T.greenPrimary, targetView: "reviews-list" },
+      { label: "Claims To Review", value: counts.verified, icon: BadgeCheck, accent: "#4338CA", targetView: "reviews-list" },
+      { label: "Pending Review Total", value: fmtN(claims.filter((c) => c.status === "verified").reduce((s, c) => s + (c.amount || 0), 0)), icon: CircleDollarSign, accent: T.greenPrimary, targetView: "reviews-list" },
       { label: "Approved For Payment", value: counts.approved_for_payment, icon: CircleDollarSign, accent: "#0D9488", targetView: "all-claims-list" },
       { label: "Total Claims", value: counts.total, icon: FileEdit, accent: "#2563EB", targetView: "all-claims-list" },
     ];
-  } else if (role === "admin") {
-    // Admin Dashboard: Retains Further Approval card and full controls
+  } else {
+    // Admin
     cards = [
       { label: "Total Claims", value: counts.total, icon: FileEdit, accent: "#2563EB", targetView: "all-claims-list" },
-      { label: "New Claims", value: counts.new, icon: FilePlus2, accent: "#0D9488", targetView: "new-claim-list" },
-      { label: "In Review (Chairman)", value: counts.verified, icon: BadgeCheck, accent: "#4338CA", targetView: "reviews-list" },
-      { label: "Further Approval", value: counts.further_approval, icon: Building, accent: "#7C3AED", targetView: "further-approval" },
+      { label: "New (To Verify)", value: counts.new, icon: FilePlus2, accent: "#2563EB", targetView: "all-claims-list" },
+      { label: "Under Chairman Review", value: counts.verified, icon: BadgeCheck, accent: "#4338CA", targetView: "reviews-list" },
+      { label: "Approved (Ready to Pay)", value: counts.approved_for_payment, icon: CircleDollarSign, accent: "#0D9488", targetView: "approved-for-payment" },
     ];
   }
 
   const recent = (
-    role === "user"
-      ? claims.filter((c) => c.claimant === currentUser)
-      : role === "chairman"
+    role === "chairman"
       ? claims.filter((c) => c.status === "verified")
       : claims
   ).slice(0, 10);
@@ -838,9 +760,8 @@ function DashboardView({ role, claims, users, currentUser, onNavigate, onTrackCl
                       onNavigate={onNavigate}
                       onTrack={() => onTrackClaim(c)}
                       onTransition={onTransition}
-                      onOpenFeedback={(claim, targetRole) => {
+                      onOpenReview={(claim) => {
                         setFeedbackClaim(claim);
-                        setSendBackTarget(targetRole || "accountant");
                         setFeedbackText("");
                       }}
                       onDelete={onDelete}
@@ -853,153 +774,281 @@ function DashboardView({ role, claims, users, currentUser, onNavigate, onTrackCl
         </div>
       </div>
 
-      {/* Chairman Send Back / Feedback Modal */}
-      {feedbackClaim && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 animate-scale-in space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-sm text-slate-800">
-                {sendBackTarget === "accountant" ? "Verify & Send to Accountant" : "Send Feedback / Return Claim"}
-              </h3>
-              <button onClick={() => setFeedbackClaim(null)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X size={16} />
-              </button>
-            </div>
-            <p className="text-xs text-slate-500">
-              Claim <span className="font-bold font-mono text-slate-800">{feedbackClaim.id}</span> ({feedbackClaim.claimant})
-            </p>
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">
-                {sendBackTarget === "accountant"
-                  ? "Instructions / Notes for Accountant:"
-                  : "Feedback / Rejection Reason:"}
-              </label>
-              <textarea
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                rows={4}
-                placeholder={
-                  sendBackTarget === "accountant"
-                    ? "e.g. Verified by Chairman Board. Proceed with disbursement."
-                    : "e.g. Please clarify mileage breakdown before re-submission."
-                }
-                className="w-full border border-slate-200 rounded-xl p-3 text-xs outline-none font-medium focus:border-emerald-600"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                onClick={() => setFeedbackClaim(null)}
-                className="px-4 py-2 text-xs font-medium rounded-xl border border-slate-200 text-slate-600 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (sendBackTarget === "accountant") {
-                    onTransition(feedbackClaim.id, "approved_for_payment", feedbackText);
-                  } else {
-                    onTransition(feedbackClaim.id, "pending", feedbackText);
-                  }
-                  setFeedbackClaim(null);
-                }}
-                className="px-4 py-2 text-xs font-semibold rounded-xl text-white shadow-xs cursor-pointer"
-                style={{ backgroundColor: T.greenPrimary }}
-              >
-                Submit & Send
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReviewClaimModal
+        claim={feedbackClaim}
+        feedbackText={feedbackText}
+        setFeedbackText={setFeedbackText}
+        onClose={() => { setFeedbackClaim(null); setFeedbackText(""); }}
+        onTransition={onTransition}
+      />
     </div>
   );
 }
 
-/* RELATIVE DROPDOWN ACTION MENU POSITIONED INSIDE TABLE BOUNDS DIRECTLY UNDER BUTTON */
-function DashboardClaimRowAction({ claim, role, onNavigate, onTrack, onTransition, onOpenFeedback, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+/* ---------------------------------------------------------------- */
+/* REVIEW CLAIM MODAL — compact clean decision popup               */
+/* ---------------------------------------------------------------- */
+function ReviewClaimModal({ claim, feedbackText, setFeedbackText, onClose, onTransition }) {
+  if (!claim) return null;
 
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+      style={{
+        backgroundColor: "rgba(15, 23, 42, 0.4)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full max-w-[440px] my-auto bg-white rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden text-left"
+        style={{
+          boxShadow: "0 25px 60px -15px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.08)",
+          animation: "scaleIn 0.15s cubic-bezier(0.34,1.4,0.64,1)"
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header row */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+              <BadgeCheck size={18} />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-slate-800 leading-tight">Review Claim</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Chairman board decision</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center text-slate-400 transition-colors cursor-pointer"
+            title="Close"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Claim info rows */}
+        <div style={{ padding: "0.9rem 1.25rem", borderBottom: "1px solid #f1f5f9" }}>
+          {[
+            { label: "Claim ID",  value: claim.id,       mono: true },
+            { label: "Claimant", value: claim.claimant },
+            { label: "Amount",   value: fmtN(claim.amount), bold: true, green: true },
+            { label: "Title",    value: claim.title },
+          ].map((r, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "4px 0", borderBottom: i < 3 ? "1px dashed #f1f5f9" : "none" }}>
+              <span style={{ minWidth: 68, fontSize: "0.62rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>{r.label}</span>
+              <span style={{
+                fontSize: r.bold ? "0.85rem" : "0.73rem",
+                fontWeight: r.bold ? 800 : 600,
+                fontFamily: r.mono ? "monospace" : "inherit",
+                color: r.green ? "#065f46" : "#1e293b",
+                lineHeight: 1.4
+              }}>{r.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Remarks */}
+        <div style={{ padding: "0.9rem 1.25rem", borderBottom: "1px solid #f1f5f9" }}>
+          <label style={{ display: "block", fontSize: "0.68rem", fontWeight: 700, color: "#475569", marginBottom: 6 }}>
+            Remarks <span style={{ color: "#cbd5e1", fontWeight: 500 }}>— optional</span>
+          </label>
+          <textarea
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            rows={3}
+            placeholder="Add approval notes or rejection reason..."
+            style={{
+              width: "100%", boxSizing: "border-box",
+              border: "1.5px solid #e2e8f0", borderRadius: "0.65rem",
+              padding: "0.6rem 0.75rem", fontSize: "0.73rem",
+              fontFamily: "inherit", fontWeight: 500,
+              color: "#1e293b", background: "#f8fafc",
+              resize: "none", outline: "none",
+              lineHeight: 1.5, transition: "border-color 0.12s"
+            }}
+            onFocus={(e) => { e.target.style.borderColor = "#10b981"; e.target.style.background = "#fff"; }}
+            onBlur={(e)  => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
+          />
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: "0.6rem", padding: "0.9rem 1.25rem" }}>
+          <button
+            onClick={() => { onTransition(claim.id, "rejected", feedbackText || "Rejected by Chairman Board."); onClose(); }}
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "0.65rem 0", borderRadius: "0.75rem",
+              border: "1.5px solid #fecaca", background: "#fff1f2",
+              color: "#be123c", fontWeight: 700, fontSize: "0.72rem", cursor: "pointer",
+              transition: "all 0.12s"
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#ffe4e6"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#fff1f2"; }}
+          >
+            <XCircle size={14} /> Reject
+          </button>
+          <button
+            onClick={() => { onTransition(claim.id, "approved_for_payment", feedbackText || "Approved by Chairman. Proceed with payment."); onClose(); }}
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "0.65rem 0", borderRadius: "0.75rem",
+              border: "none", background: "#059669",
+              color: "#fff", fontWeight: 700, fontSize: "0.72rem", cursor: "pointer",
+              boxShadow: "0 3px 10px -2px rgba(5,150,105,0.4)",
+              transition: "all 0.12s"
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#047857"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#059669"; }}
+          >
+            <CheckCircle2 size={14} /> Accept & Send
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* PORTAL DROPDOWN — renders in document.body, escapes overflow    */
+/* ---------------------------------------------------------------- */
+function PortalDropdown({ anchorRef, menuRef, open, onClose, children }) {
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 220 });
+
+  /* Reposition whenever open state changes or window moves */
   useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    if (open) {
-      document.addEventListener("mousedown", handler);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handler);
-    };
-  }, [open]);
+    if (!open || !anchorRef.current) return;
 
+    const recalc = () => {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const dropW = 220;
+      // Right-align to button; pull left if it would overflow screen
+      let left = rect.right - dropW;
+      if (left < 8) left = rect.left;
+      // Show below by default; flip above if near bottom
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const approxH = 200;
+      const top = spaceBelow < approxH ? rect.top - approxH - 4 : rect.bottom + 6;
+      setPos({ top, left, width: dropW });
+    };
+
+    recalc();
+    window.addEventListener("resize", recalc);
+    window.addEventListener("scroll", recalc, true);
+    return () => {
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("scroll", recalc, true);
+    };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Close on outside click — but NOT when clicking inside the portal menu */
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      const insideAnchor = anchorRef.current && anchorRef.current.contains(e.target);
+      const insideMenu   = menuRef.current   && menuRef.current.contains(e.target);
+      if (!insideAnchor && !insideMenu) onClose();
+    };
+    // Use capture so we catch clicks before stopPropagation
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
+  }, [open, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={{
+        position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999,
+        background: "#fff", borderRadius: "1rem", border: "1px solid #e2e8f0",
+        boxShadow: "0 20px 60px -10px rgba(0,0,0,0.18), 0 4px 16px -4px rgba(0,0,0,0.10)",
+        padding: "6px 0"
+      }}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
+/* ACTION MENU — uses PortalDropdown so it always renders above overflow */
+function DashboardClaimRowAction({ claim, role, onNavigate, onTrack, onTransition, onOpenReview, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const btnRef  = useRef(null);   // the trigger button
+  const menuRef = useRef(null);   // the portal menu div
+  const close   = useCallback(() => setOpen(false), []);
   const currentStatus = claim.status;
 
   return (
-    <div className="relative inline-block text-right" ref={ref}>
+    <div className="inline-block">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        ref={btnRef}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
         title="Action Options"
       >
         <MoreVertical size={15} className="text-slate-600" />
       </button>
 
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 py-1.5 text-left animate-scale-in"
-          onClick={(e) => e.stopPropagation()}
+      <PortalDropdown anchorRef={btnRef} menuRef={menuRef} open={open} onClose={close}>
+        {/* Always: Track Processing */}
+        <button
+          onClick={() => { close(); onTrack(); }}
+          className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 transition-colors border-b border-slate-100 cursor-pointer"
         >
-          {/* Always Available: Track Processing */}
+          <Activity size={14} />
+          Track Processing
+        </button>
+
+        {/* Admin: Verify new claim */}
+        {currentStatus === "new" && role === "admin" && (
           <button
-            onClick={() => { setOpen(false); onTrack(); }}
-            className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 transition-colors border-b border-slate-100 cursor-pointer"
+            onClick={() => { close(); onTransition(claim.id, "verified", "Verified by Admin and forwarded for Chairman review."); }}
+            className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 cursor-pointer"
           >
-            <Activity size={14} />
-            Track Processing
+            <BadgeCheck size={14} />
+            Verify (Send for Review)
           </button>
+        )}
 
-          {/* Financial Officer Actions */}
-          {currentStatus === "new" && (role === "financial_officer" || role === "admin") && (
-            <>
-              <button onClick={() => { setOpen(false); onTransition(claim.id, "verified"); }} className="w-full text-left text-xs font-medium px-4 py-2 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 cursor-pointer">Verify & Move to Review</button>
-              <button onClick={() => { setOpen(false); onOpenFeedback(claim, "user"); }} className="w-full text-left text-xs font-medium px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer">Send Feedback</button>
-              <button onClick={() => { setOpen(false); onTransition(claim.id, "rejected"); }} className="w-full text-left text-xs font-semibold px-4 py-2 hover:bg-rose-50 text-rose-700 flex items-center gap-2 cursor-pointer">Reject</button>
-            </>
-          )}
+        {/* Chairman / Admin: Review verified claim */}
+        {currentStatus === "verified" && (
+          <button
+            onClick={() => { close(); onOpenReview(claim); }}
+            className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-indigo-50 text-indigo-700 flex items-center gap-2 cursor-pointer"
+          >
+            <Eye size={14} />
+            Review Claim
+          </button>
+        )}
 
-          {/* Chairman Board / Admin Review Actions */}
-          {(currentStatus === "verified" || currentStatus === "further_approval") && (role === "chairman" || role === "admin") && (
-            <>
-              <button onClick={() => { setOpen(false); onOpenFeedback(claim, "accountant"); }} className="w-full text-left text-xs font-medium px-4 py-2 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 cursor-pointer">Verify & Send to Accountant</button>
-              {role === "admin" && (
-                <button onClick={() => { setOpen(false); onTransition(claim.id, "further_approval"); }} className="w-full text-left text-xs font-medium px-4 py-2 hover:bg-purple-50 text-purple-700 flex items-center gap-2 cursor-pointer">Escalate to Board</button>
-              )}
-              <button onClick={() => { setOpen(false); onOpenFeedback(claim, "financial_officer"); }} className="w-full text-left text-xs font-medium px-4 py-2 hover:bg-amber-50 text-amber-700 flex items-center gap-2 cursor-pointer">Send Back to Fin. Officer</button>
-              <button onClick={() => { setOpen(false); onTransition(claim.id, "rejected"); }} className="w-full text-left text-xs font-semibold px-4 py-2 hover:bg-rose-50 text-rose-700 flex items-center gap-2 cursor-pointer">Reject</button>
-            </>
-          )}
+        {/* Admin: Mark approved claim as paid */}
+        {currentStatus === "approved_for_payment" && role === "admin" && (
+          <button
+            onClick={() => { close(); onTransition(claim.id, "paid", "Payment disbursed by Admin."); }}
+            className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 cursor-pointer"
+          >
+            <CheckCircle2 size={14} />
+            Mark as Paid
+          </button>
+        )}
 
-          {/* Accountant Actions */}
-          {currentStatus === "approved_for_payment" && (role === "accountant" || role === "admin") && (
-            <button onClick={() => { setOpen(false); onTransition(claim.id, "paid"); }} className="w-full text-left text-xs font-semibold px-4 py-2 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 cursor-pointer">Mark as Paid</button>
-          )}
-
-          {/* User Resubmit Actions */}
-          {currentStatus === "pending" && role === "user" && (
-            <button onClick={() => { setOpen(false); onTransition(claim.id, "new"); }} className="w-full text-left text-xs font-semibold px-4 py-2 hover:bg-emerald-50 text-emerald-700 flex items-center gap-2 cursor-pointer">Resubmit Claim</button>
-          )}
-
-          {/* DELETE PRIVILEGE RESTRICTED STRICTLY TO ADMIN ONLY */}
-          {role === "admin" && (
-            <button onClick={() => { setOpen(false); onDelete(claim.id); }} className="w-full text-left text-xs font-semibold px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-slate-100 cursor-pointer">
-              <Trash2 size={13} />
-              Delete Claim
-            </button>
-          )}
-        </div>
-      )}
+        {/* Admin only: Delete */}
+        {role === "admin" && (
+          <button
+            onClick={() => { close(); onDelete(claim.id); }}
+            className="w-full text-left text-xs font-semibold px-4 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-slate-100 cursor-pointer"
+          >
+            <Trash2 size={13} />
+            Delete Claim
+          </button>
+        )}
+      </PortalDropdown>
     </div>
   );
 }
@@ -1011,34 +1060,34 @@ function ClaimTrackingView({ claim, onBack }) {
   const steps = [
     {
       key: "submitted",
-      label: "Claim Submitted",
+      label: "Claim Submitted (New)",
       icon: FilePlus2,
       color: T.greenPrimary,
       bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800",
-      passedStatuses: ["new","pending","verified","further_approval","approved_for_payment","paid","rejected"],
+      passedStatuses: ["new","verified","approved_for_payment","paid","rejected"],
       activeStatuses: [],
     },
     {
-      key: "fo_review",
-      label: "Financial Officer Review",
+      key: "admin_verification",
+      label: "Admin Verification & Submit for Review",
       icon: BadgeCheck,
       color: "#4338CA",
       bg: "bg-indigo-50", border: "border-indigo-200", text: "text-indigo-800",
-      passedStatuses: ["verified","further_approval","approved_for_payment","paid"],
-      activeStatuses: ["new","pending"],
+      passedStatuses: ["verified","approved_for_payment","paid"],
+      activeStatuses: ["new"],
     },
     {
       key: "chairman_review",
-      label: "Chairman Board Review",
+      label: "Chairman Board Review & Decision",
       icon: Building2,
       color: "#7C3AED",
       bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800",
       passedStatuses: ["approved_for_payment","paid"],
-      activeStatuses: ["verified", "further_approval"],
+      activeStatuses: ["verified"],
     },
     {
       key: "payment",
-      label: "Accountant Payment Processing",
+      label: "Admin Payment & Disbursement",
       icon: CircleDollarSign,
       color: "#0D9488",
       bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-800",
@@ -1165,21 +1214,12 @@ function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser
   const [search, setSearch] = useState("");
   const [feedbackClaim, setFeedbackClaim] = useState(null);
   const [feedbackText, setFeedbackText] = useState("");
-  const [sendBackTarget, setSendBackTarget] = useState("accountant");
 
   let filtered = view === "all-claims-list"
     ? claims
     : item.status
       ? claims.filter((c) => c.status === item.status)
       : claims;
-
-  if (role === "user") {
-    filtered = filtered.filter((c) => c.claimant === currentUser);
-  } else if (role === "chairman") {
-    if (view === "reviews-list") {
-      filtered = filtered.filter((c) => c.status === "verified");
-    }
-  }
 
   if (search) {
     const q = search.toLowerCase();
@@ -1188,16 +1228,6 @@ function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser
 
   const pageSize = 10;
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  const submitFeedback = () => {
-    if (sendBackTarget === "accountant") {
-      onTransition(feedbackClaim.id, "approved_for_payment", feedbackText);
-    } else {
-      onTransition(feedbackClaim.id, "pending", feedbackText);
-    }
-    setFeedbackClaim(null);
-    setFeedbackText("");
-  };
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -1250,9 +1280,9 @@ function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser
                           role={role}
                           onTrack={() => onTrackClaim(c)}
                           onTransition={onTransition}
-                          onOpenFeedback={(claim, target) => {
+                          onOpenReview={(claim) => {
                             setFeedbackClaim(claim);
-                            setSendBackTarget(target || "accountant");
+                            setFeedbackText("");
                           }}
                           onDelete={onDelete}
                         />
@@ -1267,27 +1297,13 @@ function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser
         )}
       </div>
 
-      {feedbackClaim && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 animate-scale-in space-y-4">
-            <h3 className="font-bold text-sm text-slate-800">
-              {sendBackTarget === "accountant" ? "Verify & Send to Accountant" : "Send Feedback"}
-            </h3>
-            <p className="text-xs text-slate-500">To {feedbackClaim.claimant} regarding {feedbackClaim.id}.</p>
-            <textarea
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              rows={4}
-              placeholder="e.g. Verified by Chairman Board..."
-              className="w-full border border-slate-200 rounded-xl p-3 text-xs outline-none font-medium focus:border-emerald-600"
-            />
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button onClick={() => setFeedbackClaim(null)} className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600">Cancel</button>
-              <button onClick={submitFeedback} className="px-4 py-2 text-xs font-semibold rounded-xl text-white shadow-xs" style={{ backgroundColor: T.greenPrimary }}>Submit</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReviewClaimModal
+        claim={feedbackClaim}
+        feedbackText={feedbackText}
+        setFeedbackText={setFeedbackText}
+        onClose={() => { setFeedbackClaim(null); setFeedbackText(""); }}
+        onTransition={onTransition}
+      />
     </div>
   );
 }
@@ -1419,23 +1435,23 @@ function ManageClaimSheet({ onSubmitClaim, currentUser, onClose }) {
   return (
     <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-2xs z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
       <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[92vh] animate-scale-in">
-        <div className="bg-slate-900 text-white px-6 py-5 sm:px-8 flex items-center justify-between flex-shrink-0">
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100 text-slate-800 border-b border-emerald-200/80 px-6 py-5 sm:px-8 flex items-center justify-between flex-shrink-0">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <span className="px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-emerald-500/30">
-                Claim Application 
+              <span className="px-3 py-0.5 rounded-full bg-emerald-600/10 text-emerald-800 text-[11px] font-bold border border-emerald-300">
+                Claim Application
               </span>
-              <span className="text-xs font-mono font-bold text-white bg-white/10 px-2.5 py-0.5 rounded-lg border border-white/20">
+              <span className="text-xs font-mono font-bold text-emerald-900 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200 shadow-2xs">
                 {claimRefNo}
               </span>
             </div>
-            <h2 className="text-xl font-bold tracking-tight">Submit New Claim</h2>
+            <h2 className="text-xl font-bold tracking-tight text-emerald-950">Submit New Claim</h2>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-2xl transition-colors cursor-pointer"
+            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-emerald-200/50 rounded-2xl transition-colors cursor-pointer border border-transparent hover:border-emerald-300"
             title="Close Modal"
           >
             <X size={22} />
@@ -2002,8 +2018,8 @@ function ManageClaimSheet({ onSubmitClaim, currentUser, onClose }) {
 function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", username: "", role: "user", password: "" });
-  const [editForm, setEditForm] = useState({ name: "", email: "", username: "", role: "user", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", username: "", role: "chairman", password: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", username: "", role: "chairman", password: "" });
 
   const isAdmin = role === "admin";
 
@@ -2023,7 +2039,7 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
     e.preventDefault();
     if (!form.name || !form.username || !form.email || !form.role || !form.password) return;
     onAddUser(form);
-    setForm({ name: "", email: "", username: "", role: "user", password: "" });
+    setForm({ name: "", email: "", username: "", role: "chairman", password: "" });
     setShowForm(false);
   };
 
@@ -2044,7 +2060,7 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-800">User Account Management</h2>
-          <p className="text-xs text-slate-400 font-medium">Manage organization accounts, credentials and system roles.</p>
+          <p className="text-xs text-slate-400 font-medium">Add and manage Chairman and Admin accounts.</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -2071,7 +2087,7 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Email Address</label>
-              <input required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} type="email" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-none font-medium focus:border-emerald-600" placeholder="email@hdiportal.com" />
+              <input required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} type="email" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-none font-medium focus:border-emerald-600" placeholder="email@hdi.org" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
@@ -2217,7 +2233,7 @@ export default function IFRSPreview() {
         claimant: c.claimantName || c.claimant
       })));
 
-      if (loggedInUser.role === "admin" || loggedInUser.role === "financial_officer") {
+      if (loggedInUser.role === "admin") {
         const fetchedUsers = await api.getUsers();
         setUsers(fetchedUsers.map(u => ({
           ...u,
@@ -2242,10 +2258,10 @@ export default function IFRSPreview() {
     }
   }, [loggedInUser]);
 
-  const role = loggedInUser?.role || "user";
-  const currentUser = loggedInUser?.name || loggedInUser?.username || "";
+  const role = loggedInUser?.role || "admin";
+  const currentUser = loggedInUser?.name || loggedInUser?.username || "Super Admin";
 
-  const access = MENU_ACCESS[role] || MENU_ACCESS.user || ["dashboard"];
+  const access = MENU_ACCESS[role] || MENU_ACCESS.admin || ["dashboard"];
   const view = access.includes(activeView) ? activeView : "dashboard";
 
   const handleTransition = async (id, newStatus, note) => {
@@ -2369,7 +2385,7 @@ export default function IFRSPreview() {
               onClose={() => setActiveView("dashboard")}
             />
           )}
-          {["new-claim-list", "reviews-list", "further-approval", "approved-for-payment", "paid-list", "pending-claim-list", "rejected-claim-list", "all-claims-list"].includes(view) && (
+          {["reviews-list", "approved-for-payment", "paid-list", "rejected-claim-list", "all-claims-list"].includes(view) && (
             <ClaimListView
               view={view}
               role={role}
