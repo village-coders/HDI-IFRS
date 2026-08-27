@@ -4,7 +4,7 @@ import { api } from "./services/api.js";
 import {
   LayoutDashboard, Bell, BookOpen, Users as UsersIcon, LogOut, ChevronDown,
   ChevronRight, Search, Plus, CheckCircle2, XCircle, Clock3, RotateCcw,
-  Eye, Trash2, ShieldCheck, Wallet, Landmark, Building2, Lock, User as UserIcon,
+  Eye, EyeOff, Trash2, ShieldCheck, Wallet, Landmark, Building2, Lock, User as UserIcon,
   Menu as MenuIcon, X, FileEdit, FilePlus2, BadgeCheck, CircleDollarSign,
   PlusCircle, Calculator, ArrowRight, MessageSquare,
   ChevronLeft, ChevronRight as ChevronRightIcon, Building, MoreVertical,
@@ -472,10 +472,9 @@ function LoginPage({ onLogin, usersList = USERS_SEED }) {
 /* ---------------------------------------------------------------- */
 /* SIDEBAR                                                           */
 /* ---------------------------------------------------------------- */
-function Sidebar({ role, activeView, setActiveView, mobileOpen, setMobileOpen, claims = [], users = [], collapsed, setCollapsed, onLogout }) {
+function Sidebar({ role, activeView, setActiveView, mobileOpen, setMobileOpen, claims = [], users = [], collapsed, setCollapsed, onLogout, currentUser }) {
   const access = MENU_ACCESS[role] || MENU_ACCESS.user || [];
-  const currentUserObj = users.find((u) => u.role === role);
-  const currentUserName = currentUserObj ? currentUserObj.name : "Admin Super Admin";
+  const currentUserName = currentUser || "Admin Super Admin";
 
   const navItems = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -2020,6 +2019,7 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", username: "", role: "chairman", password: "" });
   const [editForm, setEditForm] = useState({ name: "", email: "", username: "", role: "chairman", password: "" });
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const isAdmin = role === "admin";
 
@@ -2045,13 +2045,20 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
 
   const startEdit = (u) => {
     setEditingUser(u);
-    setEditForm({ _id: u._id, name: u.name, email: u.email, username: u.username, role: u.role, password: u.password });
+    // Never pre-fill password — user must explicitly type a new one to change it
+    setEditForm({ _id: u._id, name: u.name, email: u.email, username: u.username, role: u.role, password: "" });
+    setShowEditPassword(false);
   };
 
   const submitEdit = (e) => {
     e.preventDefault();
-    if (!editForm.name) return;
-    onUpdateUser({ ...editForm, _id: editingUser._id, username: editingUser.username });
+    if (!editForm.name || !editForm.email) return;
+    // Only include password in the payload if the user actually typed a new one
+    const payload = { _id: editingUser._id, username: editingUser.username, name: editForm.name, email: editForm.email, role: editForm.role };
+    if (editForm.password && editForm.password.trim().length > 0) {
+      payload.password = editForm.password.trim();
+    }
+    onUpdateUser(payload);
     setEditingUser(null);
   };
 
@@ -2124,10 +2131,10 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
               {users.map((u) => {
                 const roleInfo = ROLES.find((r) => r.id === u.role);
                 return (
-                  <tr key={u.username} className="hover:bg-slate-50 transition-colors font-medium">
+                  <tr key={u._id || u.username} className="hover:bg-slate-50 transition-colors font-medium">
                     <td className="px-5 py-3.5 font-semibold text-slate-800">{u.name}</td>
                     <td className="px-5 py-3.5 font-mono text-emerald-800 font-bold">{u.username}</td>
-                    <td className="px-5 py-3.5 font-mono text-slate-600">{u.password || "••••••••"}</td>
+                    <td className="px-5 py-3.5 font-mono text-slate-500 tracking-widest">••••••••</td>
                     <td className="px-5 py-3.5 text-slate-500">{u.email}</td>
                     <td className="px-5 py-3.5">
                       <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -2160,41 +2167,146 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
         </div>
       </div>
 
-      {editingUser && (
-        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-2xs z-50 flex items-center justify-center p-4">
-          <form onSubmit={submitEdit} className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-scale-in space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-sm text-slate-800">Edit Account ({editingUser.username})</h3>
-              <button type="button" onClick={() => setEditingUser(null)} className="p-1 text-slate-400 hover:text-slate-700">
-                <X size={18} />
+      {/* Edit User Modal — rendered via portal so backdrop is always correct */}
+      {editingUser && createPortal(
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 99999,
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingUser(null); }}
+        >
+          <form
+            onSubmit={submitEdit}
+            style={{ animation: "scaleIn 0.15s cubic-bezier(0.34,1.4,0.64,1)" }}
+            className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-200/80 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+                  <UserIcon size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-800 leading-tight">Edit Account</h3>
+                  <p className="text-[11px] text-slate-400 font-medium font-mono">{editingUser.username}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="w-7 h-7 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X size={14} />
               </button>
             </div>
-            <div className="space-y-3">
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Full Name */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Full Name</label>
-                <input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:border-emerald-600" />
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Full Name</label>
+                <input
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  placeholder="Full name"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-800 outline-none bg-slate-50 focus:bg-white transition-colors"
+                  style={{ focusBorderColor: T.greenPrimary }}
+                  onFocus={(e) => { e.target.style.borderColor = T.greenPrimary; e.target.style.background = "#fff"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
+                />
               </div>
+
+              {/* Email */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Email</label>
-                <input required value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} type="email" className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:border-emerald-600" />
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email Address</label>
+                <input
+                  required
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  placeholder="email@hdi.org"
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-800 outline-none bg-slate-50"
+                  onFocus={(e) => { e.target.style.borderColor = T.greenPrimary; e.target.style.background = "#fff"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
+                />
               </div>
+
+              {/* New Password */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
-                <input value={editForm.password || ""} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} type="text" className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs outline-none focus:border-emerald-600 font-mono" />
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  New Password
+                  <span className="ml-1.5 text-slate-400 font-normal">— leave blank to keep current</span>
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type={showEditPassword ? "text" : "password"}
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    placeholder="Enter new password to change"
+                    className="w-full border border-slate-200 rounded-xl pl-3.5 pr-10 py-2.5 text-xs font-medium text-slate-800 outline-none bg-slate-50 font-mono"
+                    onFocus={(e) => { e.target.style.borderColor = T.greenPrimary; e.target.style.background = "#fff"; }}
+                    onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; e.target.style.background = "#f8fafc"; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword((v) => !v)}
+                    className="absolute right-3 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                    tabIndex={-1}
+                    title={showEditPassword ? "Hide password" : "Show password"}
+                  >
+                    {showEditPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                {editForm.password && editForm.password.length > 0 && editForm.password.length < 8 && (
+                  <p className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
+                    <span>⚠</span> Password must be at least 8 characters
+                  </p>
+                )}
               </div>
+
+              {/* Role */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Role</label>
-                <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full border border-slate-200 rounded-xl px-3.5 py-2 text-xs outline-none bg-white focus:border-emerald-600">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Role</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-800 outline-none bg-slate-50"
+                  onFocus={(e) => { e.target.style.borderColor = T.greenPrimary; }}
+                  onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }}
+                >
                   {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
                 </select>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600">Cancel</button>
-              <button type="submit" className="px-5 py-2 text-xs font-semibold text-white shadow-xs" style={{ backgroundColor: T.greenPrimary }}>Save Changes</button>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/60">
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={editForm.password.length > 0 && editForm.password.length < 8}
+                className="px-5 py-2 text-xs font-semibold rounded-xl text-white shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                style={{ backgroundColor: T.greenPrimary }}
+              >
+                Save Changes
+              </button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -2344,6 +2456,7 @@ export default function IFRSPreview() {
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
         onLogout={() => { setLoggedInUser(null); setActiveView("dashboard"); }}
+        currentUser={currentUser}
       />
 
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
