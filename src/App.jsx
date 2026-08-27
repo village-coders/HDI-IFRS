@@ -2264,9 +2264,9 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
                     {showEditPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
-                {editForm.password && editForm.password.length > 0 && editForm.password.length < 8 && (
+                {editForm.password && editForm.password.length > 0 && editForm.password.length < 6 && (
                   <p className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
-                    <span>⚠</span> Password must be at least 8 characters
+                    <span>⚠</span> Password must be at least 6 characters
                   </p>
                 )}
               </div>
@@ -2297,7 +2297,7 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
               </button>
               <button
                 type="submit"
-                disabled={editForm.password.length > 0 && editForm.password.length < 8}
+                disabled={editForm.password.length > 0 && editForm.password.length < 6}
                 className="px-5 py-2 text-xs font-semibold rounded-xl text-white shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 style={{ backgroundColor: T.greenPrimary }}
               >
