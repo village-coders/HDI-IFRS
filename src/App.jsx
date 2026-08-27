@@ -40,6 +40,152 @@ const STATUS = {
 const fmtN = (n) => "₦" + (Number(n) || 0).toLocaleString();
 
 /* ---------------------------------------------------------------- */
+/* TOAST NOTIFICATION SYSTEM                                          */
+/* ---------------------------------------------------------------- */
+let _toastEmit = null;
+export function useToast() {
+  const [toasts, setToasts] = useState([]);
+  _toastEmit = (msg, type = "error") => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+  return { toasts, removeToast: (id) => setToasts(prev => prev.filter(t => t.id !== id)) };
+}
+function toast(msg, type = "error") {
+  if (_toastEmit) _toastEmit(msg, type);
+  else console.error(msg);
+}
+
+function ToastContainer({ toasts, removeToast }) {
+  if (!toasts.length) return null;
+  return createPortal(
+    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 999999, display: "flex", flexDirection: "column", gap: 10, maxWidth: 360 }}>
+      {toasts.map(t => {
+        const isError   = t.type === "error";
+        const isSuccess = t.type === "success";
+        return (
+          <div
+            key={t.id}
+            style={{
+              display: "flex", alignItems: "flex-start", gap: 10,
+              padding: "12px 16px",
+              background: isError ? "#fff1f2" : isSuccess ? "#f0fdf4" : "#fffbeb",
+              border: `1.5px solid ${isError ? "#fecaca" : isSuccess ? "#bbf7d0" : "#fde68a"}`,
+              borderRadius: "0.875rem",
+              boxShadow: "0 8px 24px -4px rgba(0,0,0,0.14), 0 2px 8px -2px rgba(0,0,0,0.08)",
+              animation: "scaleIn 0.18s cubic-bezier(0.34,1.4,0.64,1)",
+            }}
+          >
+            <span style={{ fontSize: 15, flexShrink: 0 }}>{isError ? "❌" : isSuccess ? "✅" : "⚠️"}</span>
+            <p style={{ fontSize: "0.72rem", fontWeight: 600, color: isError ? "#be123c" : isSuccess ? "#15803d" : "#92400e", lineHeight: 1.5, flex: 1 }}>{t.msg}</p>
+            <button onClick={() => removeToast(t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+          </div>
+        );
+      })}
+    </div>,
+    document.body
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* FULL-SCREEN LOADING SKELETON                                       */
+/* ---------------------------------------------------------------- */
+function AppLoadingScreen() {
+  return (
+    <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
+      {/* Sidebar skeleton */}
+      <div className="hidden lg:flex w-64 flex-shrink-0 bg-white border-r border-slate-200 flex-col">
+        <div className="px-5 py-5 border-b border-slate-100 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-slate-200 animate-pulse" />
+          <div className="space-y-1.5 flex-1">
+            <div className="h-3 w-28 bg-slate-200 rounded animate-pulse" />
+            <div className="h-2 w-20 bg-slate-100 rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="p-3 space-y-1.5">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="h-9 rounded-xl bg-slate-100 animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+          ))}
+        </div>
+      </div>
+      {/* Main content skeleton */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Topbar skeleton */}
+        <div className="h-[72px] bg-white border-b border-slate-200 px-8 flex items-center justify-between shadow-2xs">
+          <div className="space-y-1.5">
+            <div className="h-5 w-48 bg-slate-200 rounded animate-pulse" />
+            <div className="h-2.5 w-64 bg-slate-100 rounded animate-pulse" />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-slate-100 animate-pulse" />
+            <div className="w-28 h-9 rounded-xl bg-slate-200 animate-pulse" />
+          </div>
+        </div>
+        {/* Body skeleton */}
+        <div className="p-8 space-y-6">
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="h-2.5 w-20 bg-slate-200 rounded animate-pulse" />
+                  <div className="w-9 h-9 rounded-xl bg-slate-200 animate-pulse" />
+                </div>
+                <div className="h-7 w-16 bg-slate-200 rounded animate-pulse" />
+                <div className="h-2 w-24 bg-slate-100 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          {/* Table card */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1.5">
+                <div className="h-4 w-40 bg-slate-200 rounded animate-pulse" />
+                <div className="h-2.5 w-60 bg-slate-100 rounded animate-pulse" />
+              </div>
+              <div className="h-8 w-28 rounded-xl bg-slate-100 animate-pulse" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-4" style={{ animationDelay: `${i * 80}ms` }}>
+                  <div className="h-10 flex-1 bg-slate-100 rounded-xl animate-pulse" />
+                  <div className="h-10 flex-1 bg-slate-100 rounded-xl animate-pulse" />
+                  <div className="h-10 flex-1 bg-slate-100 rounded-xl animate-pulse" />
+                  <div className="h-10 w-24 bg-slate-100 rounded-xl animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* TABLE SKELETON ROWS                                                */
+/* ---------------------------------------------------------------- */
+function SkeletonRows({ cols = 6, rows = 5 }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={i}>
+          {Array.from({ length: cols }).map((_, j) => (
+            <td key={j} className="px-4 py-3.5">
+              <div
+                className="h-3.5 rounded-lg bg-slate-100 animate-pulse"
+                style={{ width: j === 0 ? "90px" : j === cols - 1 ? "60px" : "100%", animationDelay: `${(i * cols + j) * 30}ms` }}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/* ---------------------------------------------------------------- */
 /* INITIAL SEED DATA                                                 */
 /* ---------------------------------------------------------------- */
 const CLAIMS_SEED = [
@@ -588,7 +734,7 @@ function Sidebar({ role, activeView, setActiveView, mobileOpen, setMobileOpen, c
 /* ---------------------------------------------------------------- */
 /* TOPBAR                                                            */
 /* ---------------------------------------------------------------- */
-function Topbar({ role, viewTitle, setMobileOpen, notifications, onMarkAllRead, currentUser, onLogout, sidebarCollapsed, setSidebarCollapsed }) {
+function Topbar({ role, viewTitle, setMobileOpen, notifications, onMarkAllRead, currentUser, onLogout, sidebarCollapsed, setSidebarCollapsed, isRefreshing, onRefresh }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
   const unread = notifications.filter((n) => !n.read).length;
@@ -651,12 +797,14 @@ function Topbar({ role, viewTitle, setMobileOpen, notifications, onMarkAllRead, 
         </div>
 
         <button
-          onClick={() => window.location.reload()}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs transition-all cursor-pointer disabled:opacity-70"
           style={{ backgroundColor: T.greenPrimary }}
+          title="Refresh data from server"
         >
-          <RotateCcw size={14} />
-          <span>Refresh Data</span>
+          <RotateCcw size={14} className={isRefreshing ? "animate-spin" : ""} />
+          <span>{isRefreshing ? "Refreshing..." : "Refresh Data"}</span>
         </button>
       </div>
     </header>
@@ -666,7 +814,7 @@ function Topbar({ role, viewTitle, setMobileOpen, notifications, onMarkAllRead, 
 /* ---------------------------------------------------------------- */
 /* DASHBOARD VIEW                                                    */
 /* ---------------------------------------------------------------- */
-function DashboardView({ role, claims, users, currentUser, onNavigate, onTrackClaim, onTransition, onDelete }) {
+function DashboardView({ role, claims, users, currentUser, loadingData, onNavigate, onTrackClaim, onTransition, onDelete }) {
   const [feedbackClaim, setFeedbackClaim] = useState(null);
   const [feedbackText, setFeedbackText] = useState("");
   const [sendBackTarget, setSendBackTarget] = useState("accountant");
@@ -744,30 +892,40 @@ function DashboardView({ role, claims, users, currentUser, onNavigate, onTrackCl
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {recent.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-50/80 transition-colors font-medium">
-                  <td className="py-4 px-3 font-bold font-mono text-emerald-800 cursor-pointer whitespace-nowrap" onClick={() => onNavigate("all-claims-list")}>{c.id}</td>
-                  <td className="py-4 px-3 font-semibold text-slate-800 whitespace-nowrap">{c.claimant}</td>
-                  <td className="py-4 px-3 text-slate-600">{c.title}</td>
-                  <td className="py-4 px-3 font-bold text-slate-800 whitespace-nowrap">{fmtN(c.amount)}</td>
-                  <td className="py-4 px-3 text-slate-400 whitespace-nowrap">{c.date}</td>
-                  <td className="py-4 px-3 whitespace-nowrap"><StatusBadge status={c.status} /></td>
-                  <td className="py-4 px-3 text-center whitespace-nowrap">
-                    <DashboardClaimRowAction
-                      claim={c}
-                      role={role}
-                      onNavigate={onNavigate}
-                      onTrack={() => onTrackClaim(c)}
-                      onTransition={onTransition}
-                      onOpenReview={(claim) => {
-                        setFeedbackClaim(claim);
-                        setFeedbackText("");
-                      }}
-                      onDelete={onDelete}
-                    />
+              {loadingData ? (
+                <SkeletonRows cols={7} rows={5} />
+              ) : recent.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-xs text-slate-400 font-medium">
+                    No recent claim activity found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                recent.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50/80 transition-colors font-medium">
+                    <td className="py-4 px-3 font-bold font-mono text-emerald-800 cursor-pointer whitespace-nowrap" onClick={() => onNavigate("all-claims-list")}>{c.id}</td>
+                    <td className="py-4 px-3 font-semibold text-slate-800 whitespace-nowrap">{c.claimant}</td>
+                    <td className="py-4 px-3 text-slate-600">{c.title}</td>
+                    <td className="py-4 px-3 font-bold text-slate-800 whitespace-nowrap">{fmtN(c.amount)}</td>
+                    <td className="py-4 px-3 text-slate-400 whitespace-nowrap">{c.date}</td>
+                    <td className="py-4 px-3 whitespace-nowrap"><StatusBadge status={c.status} /></td>
+                    <td className="py-4 px-3 text-center whitespace-nowrap">
+                      <DashboardClaimRowAction
+                        claim={c}
+                        role={role}
+                        onNavigate={onNavigate}
+                        onTrack={() => onTrackClaim(c)}
+                        onTransition={onTransition}
+                        onOpenReview={(claim) => {
+                          setFeedbackClaim(claim);
+                          setFeedbackText("");
+                        }}
+                        onDelete={onDelete}
+                      />
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1207,7 +1365,7 @@ function ClaimTrackingView({ claim, onBack }) {
 /* ---------------------------------------------------------------- */
 /* CLAIM LIST VIEWS                                                  */
 /* ---------------------------------------------------------------- */
-function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser, onTrackClaim }) {
+function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser, onTrackClaim, loadingData }) {
   const item = CLAIM_ITEMS.find((i) => i.key === view) || CLAIM_ITEMS[1];
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -1247,7 +1405,26 @@ function ClaimListView({ view, role, claims, onTransition, onDelete, currentUser
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
-        {filtered.length === 0 ? (
+        {loadingData ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                  <th className="text-left px-5 py-3.5">Claim ID</th>
+                  <th className="text-left px-5 py-3.5">Claimant</th>
+                  <th className="text-left px-5 py-3.5">Title</th>
+                  <th className="text-left px-5 py-3.5">Amount</th>
+                  <th className="text-left px-5 py-3.5">Date</th>
+                  <th className="text-left px-5 py-3.5">Status</th>
+                  <th className="text-center px-5 py-3.5 min-w-[80px]">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <SkeletonRows cols={7} rows={6} />
+              </tbody>
+            </table>
+          </div>
+        ) : filtered.length === 0 ? (
           <EmptyState icon={item.icon} title="Nothing here yet" subtitle={`No claims sit in ${item.label.toLowerCase()}.`} />
         ) : (
           <>
@@ -2014,7 +2191,7 @@ function ManageClaimSheet({ onSubmitClaim, currentUser, onClose }) {
 /* ---------------------------------------------------------------- */
 /* USERS VIEW                                                        */
 /* ---------------------------------------------------------------- */
-function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
+function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role, loadingData }) {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", username: "", role: "chairman", password: "" });
@@ -2128,40 +2305,48 @@ function UsersView({ users, onAddUser, onUpdateUser, onDeleteUser, role }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map((u) => {
-                const roleInfo = ROLES.find((r) => r.id === u.role);
-                return (
-                  <tr key={u._id || u.username} className="hover:bg-slate-50 transition-colors font-medium">
-                    <td className="px-5 py-3.5 font-semibold text-slate-800">{u.name}</td>
-                    <td className="px-5 py-3.5 font-mono text-emerald-800 font-bold">{u.username}</td>
-                    <td className="px-5 py-3.5 font-mono text-slate-500 tracking-widest">••••••••</td>
-                    <td className="px-5 py-3.5 text-slate-500">{u.email}</td>
-                    <td className="px-5 py-3.5">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        {roleInfo?.label || u.role}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => startEdit(u)}
-                          className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer"
-                          title="Edit User"
-                        >
-                          <FileEdit size={14} />
-                        </button>
-                        <button
-                          onClick={() => onDeleteUser(u.username)}
-                          className="p-1.5 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Delete User"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {loadingData ? (
+                <SkeletonRows cols={6} rows={4} />
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-xs text-slate-400 font-medium">No users found.</td>
+                </tr>
+              ) : (
+                users.map((u) => {
+                  const roleInfo = ROLES.find((r) => r.id === u.role);
+                  return (
+                    <tr key={u._id || u.username} className="hover:bg-slate-50 transition-colors font-medium">
+                      <td className="px-5 py-3.5 font-semibold text-slate-800">{u.name}</td>
+                      <td className="px-5 py-3.5 font-mono text-emerald-800 font-bold">{u.username}</td>
+                      <td className="px-5 py-3.5 font-mono text-slate-500 tracking-widest">••••••••</td>
+                      <td className="px-5 py-3.5 text-slate-500">{u.email}</td>
+                      <td className="px-5 py-3.5">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          {roleInfo?.label || u.role}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => startEdit(u)}
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors cursor-pointer"
+                            title="Edit User"
+                          >
+                            <FileEdit size={14} />
+                          </button>
+                          <button
+                            onClick={() => onDeleteUser(u.username)}
+                            className="p-1.5 rounded-lg border border-rose-100 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete User"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -2332,11 +2517,16 @@ export default function IFRSPreview() {
   const [users, setUsers] = useState([]);
   const [notifications, setNotifications] = useState(NOTIFICATIONS_SEED);
   const [trackingClaim, setTrackingClaim] = useState(null);
+  // initialLoad = true only on first fetch after login (shows skeleton screen)
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const { toasts, removeToast } = useToast();
 
-  const fetchBackendData = async () => {
+  const fetchBackendData = async (isManualRefresh = false) => {
     if (!loggedInUser) return;
-    setLoadingData(true);
+    if (isManualRefresh) setIsRefreshing(true);
+    else setLoadingData(true);
     try {
       const fetchedClaims = await api.getClaims();
       setClaims(fetchedClaims.map(c => ({
@@ -2352,23 +2542,29 @@ export default function IFRSPreview() {
           username: u.email.split("@")[0]
         })));
       }
+      if (isManualRefresh) toast("Data refreshed successfully.", "success");
     } catch (err) {
       console.error("Error loading data from backend:", err);
+      toast("Failed to load data: " + (err.message || "Network error."), "error");
     } finally {
       setLoadingData(false);
+      setIsRefreshing(false);
+      setInitialLoad(false);
     }
   };
 
   useEffect(() => {
     if (loggedInUser) {
       localStorage.setItem("hdi_user", JSON.stringify(loggedInUser));
-      fetchBackendData();
+      setInitialLoad(true);
+      fetchBackendData(false);
     } else {
       api.logout();
       setClaims([]);
       setUsers([]);
+      setInitialLoad(true);
     }
-  }, [loggedInUser]);
+  }, [loggedInUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const role = loggedInUser?.role || "admin";
   const currentUser = loggedInUser?.name || loggedInUser?.username || "Super Admin";
@@ -2380,10 +2576,13 @@ export default function IFRSPreview() {
     try {
       const updated = await api.updateClaimStatus(id, newStatus, note);
       setClaims((prev) =>
-        prev.map((c) => (c.id === id || c.claimId === id || c._id === id ? { ...updated, id: updated.claimId, claimant: updated.claimantName } : c))
+        prev.map((c) => (c.id === id || c.claimId === id || c._id === id
+          ? { ...updated, id: updated.claimId, claimant: updated.claimantName }
+          : c))
       );
+      toast("Claim status updated successfully.", "success");
     } catch (err) {
-      alert("Error updating claim status: " + err.message);
+      toast("Error updating claim: " + err.message, "error");
     }
   };
 
@@ -2391,8 +2590,9 @@ export default function IFRSPreview() {
     try {
       await api.deleteClaim(id);
       setClaims((prev) => prev.filter((c) => c.id !== id && c.claimId !== id && c._id !== id));
+      toast("Claim deleted successfully.", "success");
     } catch (err) {
-      alert("Error deleting claim: " + err.message);
+      toast("Error deleting claim: " + err.message, "error");
     }
   };
 
@@ -2400,8 +2600,9 @@ export default function IFRSPreview() {
     try {
       const created = await api.createClaim(newClaimData);
       setClaims((prev) => [{ ...created, id: created.claimId, claimant: created.claimantName }, ...prev]);
+      toast("Claim submitted successfully.", "success");
     } catch (err) {
-      alert("Error submitting claim: " + err.message);
+      toast("Error submitting claim: " + err.message, "error");
     }
   };
 
@@ -2409,8 +2610,9 @@ export default function IFRSPreview() {
     try {
       const created = await api.createUser(u);
       setUsers((prev) => [{ ...created, username: created.email.split("@")[0] }, ...prev]);
+      toast("User account created successfully.", "success");
     } catch (err) {
-      alert("Error adding user: " + err.message);
+      toast("Error adding user: " + err.message, "error");
     }
   };
 
@@ -2418,8 +2620,9 @@ export default function IFRSPreview() {
     try {
       const updated = await api.updateUser(updatedUser._id, updatedUser);
       setUsers((prev) => prev.map((u) => (u._id === updated._id ? { ...updated, username: updated.email.split("@")[0] } : u)));
+      toast("User account updated successfully.", "success");
     } catch (err) {
-      alert("Error updating user: " + err.message);
+      toast("Error updating user: " + err.message, "error");
     }
   };
 
@@ -2429,9 +2632,10 @@ export default function IFRSPreview() {
       if (targetUser) {
         await api.deleteUser(targetUser._id);
         setUsers((prev) => prev.filter((u) => u._id !== targetUser._id));
+        toast("User account removed.", "success");
       }
     } catch (err) {
-      alert("Error deleting user: " + err.message);
+      toast("Error deleting user: " + err.message, "error");
     }
   };
 
@@ -2443,8 +2647,15 @@ export default function IFRSPreview() {
     return <LoginPage onLogin={(user) => { setLoggedInUser(user); setActiveView("dashboard"); }} usersList={users.length > 0 ? users : USERS_SEED} />;
   }
 
+  // Show full skeleton screen on initial data load after login
+  if (initialLoad && loadingData) {
+    return <AppLoadingScreen />;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#F8FAFC] font-sans antialiased text-slate-800">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+
       <Sidebar
         role={role}
         activeView={view}
@@ -2470,6 +2681,8 @@ export default function IFRSPreview() {
           onLogout={() => { setLoggedInUser(null); setActiveView("dashboard"); }}
           sidebarCollapsed={sidebarCollapsed}
           setSidebarCollapsed={setSidebarCollapsed}
+          isRefreshing={isRefreshing}
+          onRefresh={() => fetchBackendData(true)}
         />
 
         <main className="p-6 sm:p-8 flex-1 overflow-y-auto">
@@ -2479,6 +2692,7 @@ export default function IFRSPreview() {
               claims={claims}
               users={users}
               currentUser={currentUser}
+              loadingData={loadingData}
               onNavigate={(targetView) => {
                 const target = access.includes(targetView) ? targetView : "all-claims-list";
                 setActiveView(target);
@@ -2506,6 +2720,7 @@ export default function IFRSPreview() {
               onTransition={handleTransition}
               onDelete={handleDeleteClaim}
               currentUser={currentUser}
+              loadingData={loadingData}
               onTrackClaim={(claim) => {
                 setTrackingClaim(claim);
                 setActiveView("track-claim");
@@ -2532,6 +2747,7 @@ export default function IFRSPreview() {
               onUpdateUser={handleUpdateUser}
               onDeleteUser={handleDeleteUser}
               role={role}
+              loadingData={loadingData}
             />
           )}
         </main>
