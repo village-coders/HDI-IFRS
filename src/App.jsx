@@ -94,7 +94,7 @@ const USERS_SEED = [
     _id: "u_admin",
     name: "Super Admin",
     username: "admin",
-    password: "password123",
+    password: "Password123",
     email: "admin@hdi.org",
     role: "admin",
   },
@@ -102,7 +102,7 @@ const USERS_SEED = [
     _id: "u_chairman",
     name: "Chairman Board",
     username: "chairman",
-    password: "password123",
+    password: "Password123",
     email: "chairman@hdi.org",
     role: "chairman",
   },
@@ -1016,8 +1016,8 @@ function DashboardClaimRowAction({ claim, role, onNavigate, onTrack, onTransitio
           </button>
         )}
 
-        {/* Chairman / Admin: Review verified claim */}
-        {currentStatus === "verified" && (
+        {/* Chairman only: Review verified claim */}
+        {currentStatus === "verified" && role === "chairman" && (
           <button
             onClick={() => { close(); onOpenReview(claim); }}
             className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-indigo-50 text-indigo-700 flex items-center gap-2 cursor-pointer"
